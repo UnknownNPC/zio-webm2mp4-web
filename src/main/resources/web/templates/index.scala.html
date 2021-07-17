@@ -1,0 +1,21 @@
+<html lang="en">
+    <head>
+        <title>free web2mp4 converter</title>
+        <link rel="stylesheet" href="static/styles.css">
+        <script src="static/jquery-3.6.0.min.js"></script>
+        <script>
+        $(document).ready(function () {
+            $('form input').change(function () {
+                $('form p').text(this.files[0].name + " file selected");
+            });
+        });
+        </script>
+    </head>
+    <body>
+        <form action="upload" enctype="multipart/form-data" method="POST">
+            <input type="file" name="file">
+            <p>Drag your files here or click in this area.</p>
+            <button type="submit">Upload</button>
+        </form>
+    </body>
+</html>

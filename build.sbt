@@ -10,6 +10,7 @@ lazy val compileDependencies = Seq(
   "dev.zio" %% "zio-config" % zioConfig,
   "dev.zio" %% "zio-config-typesafe" % zioConfig,
   "dev.zio" %% "zio-config-magnolia" % zioConfig,
+  "dev.zio" %% "zio-logging" % "0.5.11",
   "ws.schild" % "jave-core" % javeCore,
   "ws.schild" % "jave-all-deps" % javeCore,
   "io.d11" %% "zhttp" % zHttp,

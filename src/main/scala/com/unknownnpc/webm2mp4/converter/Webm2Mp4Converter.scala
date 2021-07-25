@@ -2,7 +2,7 @@ package com.unknownnpc.webm2mp4.converter
 
 import ws.schild.jave.encode.{AudioAttributes, EncodingAttributes, VideoAttributes}
 import ws.schild.jave.{Encoder, MultimediaObject}
-import zio.console.Console
+import zio.logging._
 import zio.{Has, IO, ZIO, ZLayer}
 
 import java.io.File
@@ -16,7 +16,7 @@ object Webm2Mp4Converter {
 
   trait Service extends Converter[File, IO[Throwable, File]]
 
-  val live: ZLayer[Console, Throwable, Webm2Mp4ConverterService] = ZLayer.fromService { console => {
+  val live: ZLayer[Logging, Throwable, Webm2Mp4ConverterService] = ZLayer.fromService { logger => {
 
     val outFileDateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm")
 
@@ -44,7 +44,7 @@ object Webm2Mp4Converter {
 
       for {
         _ <- ZIO.fromTry(Try(encoder.encode(new MultimediaObject(from), to, attrs)))
-        _ <- console.putStrLn(s"Convert time: ${System.currentTimeMillis() - start} ms")
+        _ <- logger.info(s"Convert time: ${System.currentTimeMillis() - start} ms")
       } yield to
     }
   }

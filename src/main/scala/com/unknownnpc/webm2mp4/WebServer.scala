@@ -5,8 +5,8 @@ import com.unknownnpc.webm2mp4.config.AppConfig.{Config, ConfigService}
 import com.unknownnpc.webm2mp4.converter.Chunk2FileConverter
 import com.unknownnpc.webm2mp4.converter.Chunk2FileConverter.Chunk2FileConverterService
 import com.unknownnpc.webm2mp4.web.WebAPI
-import zhttp.service.{EventLoopGroup, Server, ServerChannelFactory}
 import zhttp.service.server.ServerChannelFactory
+import zhttp.service.{EventLoopGroup, Server, ServerChannelFactory}
 import zio._
 import zio.blocking.Blocking
 import zio.clock.Clock

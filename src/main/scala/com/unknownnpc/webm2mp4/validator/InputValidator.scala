@@ -1,6 +1,6 @@
 package com.unknownnpc.webm2mp4.validator
 
-import com.unknownnpc.webm2mp4.config.AppConfig.{Config, ConfigService}
+import com.unknownnpc.webm2mp4.config.AppConfig.ConfigService
 import zio.{Has, IO, URLayer, ZIO, ZLayer}
 
 import java.io.File
@@ -14,18 +14,18 @@ object InputValidator {
   object InvalidInputFileFormat extends ValidatorResult
   object InvalidFileSize extends ValidatorResult
 
-  class Service(config: Config) {
-     def validate(input: File): IO[ValidatorResult, Unit] = {
-      for {
-        _ <- if (input.exists()) ZIO.succeed(()) else ZIO.fail(FileNotFound)
-        _ <- if (input.getName.indexOf(".webm") < 0 ) ZIO.fail(InvalidInputFileFormat) else ZIO.succeed(())
-        _ <- if (input.length() > config.input.maxFileSize) ZIO.fail(InvalidFileSize) else ZIO.succeed(())
-      } yield ()
-    }
+  trait Service {
+    def validate(input: File): IO[ValidatorResult, Unit]
   }
 
   val live: URLayer[ConfigService, InputValidatorService] =
-    ZLayer.fromService(configEnv => new Service(configEnv))
+    ZLayer.fromService(configEnv => (input: File) => {
+      for {
+        _ <- if (input.exists()) ZIO.succeed(()) else ZIO.fail(FileNotFound)
+        _ <- if (input.getName.indexOf(".webm") < 0) ZIO.fail(InvalidInputFileFormat) else ZIO.succeed(())
+        _ <- if (input.length() > configEnv.input.maxFileSize) ZIO.fail(InvalidFileSize) else ZIO.succeed(())
+      } yield ()
+    })
 
   def validate(input: File): ZIO[InputValidatorService, ValidatorResult, Unit] =
     ZIO.accessM(d => d.get.validate(input))

@@ -11,7 +11,7 @@ import zhttp.http._
 import zio._
 import zio.blocking.Blocking
 import zio.logging.{Logging, _}
-import zio.stream.{Sink, ZStream}
+import zio.stream.ZStream
 
 import java.io.File
 import java.nio.file.Paths

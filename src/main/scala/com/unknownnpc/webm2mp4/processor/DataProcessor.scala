@@ -35,4 +35,7 @@ object DataProcessor {
           } yield convertedFile
         }
     }
+
+  def process(data: Chunk[Byte]): ZIO[DataProcessorService with Blocking, DataProcessorError, File] =
+    ZIO.accessM(d => d.get.process(data))
 }

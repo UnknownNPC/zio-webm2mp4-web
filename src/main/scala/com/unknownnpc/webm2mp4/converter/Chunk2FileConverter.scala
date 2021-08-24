@@ -5,9 +5,10 @@ import zio.logging._
 import zio.stream.{ZSink, ZStream}
 import zio.{Chunk, Has, IO, ZIO, ZLayer}
 
-import java.io.File
+import java.io.{File, IOException}
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+import scala.util.Try
 
 object Chunk2FileConverter {
 
@@ -19,15 +20,23 @@ object Chunk2FileConverter {
 
     val tmpFolder = Files.createTempDirectory("webm2mp4").toFile.getPath
 
-    def tempFilePath = s"$tmpFolder/${UUID.randomUUID}"
+    def getTempFile = Paths.get(s"$tmpFolder/${UUID.randomUUID}.webm").toFile
 
     (from: Chunk[Byte]) => {
+      val tempFile = getTempFile
       for {
-        _ <- logging.info(s"Saving ${from.length} bytes to the next temp file $tempFilePath")
-        _ <- ZStream
+        _ <- logging.info(s"Saving ${from.length} bytes to the next temp file $tempFile")
+        _ <- ZIO.fromTry(Try{
+          tempFile.createNewFile()
+        })
+        runResult <- ZStream
           .fromIterable(from)
-          .run(ZSink.fromFile(Paths.get(tempFilePath)))
-        file <- ZIO.succeed(new File(tempFilePath))
+          .run(ZSink.fromFile(tempFile.toPath))
+        file <- if (runResult == from.length) {
+          ZIO.succeed(tempFile)
+        } else {
+          ZIO.fail(new IOException("Unable to store file"))
+        }
       } yield file
     }
   }

@@ -1,5 +1,7 @@
 package com.unknownnpc.webm2mp4.web
 
+import com.unknownnpc.webm2mp4.processor.DataProcessor
+import com.unknownnpc.webm2mp4.processor.DataProcessor.{ConvertorError, DataProcessorService, InvalidInputFormat, LocalStorageError}
 import html.index
 import io.netty.handler.codec.http.{HttpHeaderNames, HttpHeaderValues}
 import io.netty.util.AsciiString
@@ -10,11 +12,12 @@ import zio.blocking.Blocking
 import zio.logging.{Logging, _}
 import zio.stream.ZStream
 
+import java.io.File
 import java.nio.file.Paths
 
 object WebAPI {
 
-  val app: HttpApp[Blocking with Logging, Throwable] = HttpApp.collectM {
+  val app: HttpApp[Blocking with Logging with DataProcessorService, Throwable] = HttpApp.collectM {
     case Method.GET -> Root =>
       IO.succeed(Response.http(
         content = HttpData.CompleteData(Chunk.fromArray(
@@ -42,12 +45,33 @@ object WebAPI {
         Response.http(content = content, headers = List(contentTypeHader, cacheControlHeader)))
 
     case rec@Method.POST -> Root / "upload" =>
+
+      def string2HttpData(str: String) = HttpData.CompleteData(Chunk.fromArray(str.getBytes))
+
+      def errorToResponse(error: DataProcessor.DataProcessorError): UIO[Response.HttpResponse[Any, Nothing]] = {
+        error match {
+          case LocalStorageError => IO.succeed(Response.http(status = Status.INTERNAL_SERVER_ERROR,
+            content = string2HttpData("Internal server error (hdd)")))
+          case InvalidInputFormat => IO.succeed(Response.http(status = Status.INTERNAL_SERVER_ERROR,
+            content = string2HttpData("Invalid input file")))
+          case ConvertorError => IO.succeed(Response.http(status = Status.INTERNAL_SERVER_ERROR,
+            content = string2HttpData("Internal converter error")))
+        }
+      }
+
+      def dataToResponse(file: File): UIO[Response.HttpResponse[Blocking, Throwable]] = {
+        IO.succeed(Response.http(content = HttpData.fromStream(ZStream.fromFile(file.toPath))))
+      }
+
       rec.data.content match {
         case CompleteData(data) =>
-          for {
+
+          val result: ZIO[Blocking with Logging with DataProcessorService, DataProcessor.DataProcessorError, File] = for {
+            dataProcessor <- ZIO.environment[DataProcessorService]
             _ <- log.info(s"Retrieved request with file: ${data.length} bytes")
-            response <- ZIO.succeed(Response.text("Done"))
+            response <- dataProcessor.get.process(data)
           } yield response
+          result.foldM(errorToResponse, dataToResponse)
 
         case _ => IO.succeed(Response.text("nothing to do here"))
       }

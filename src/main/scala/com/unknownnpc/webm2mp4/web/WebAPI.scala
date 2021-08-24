@@ -1,5 +1,6 @@
 package com.unknownnpc.webm2mp4.web
 
+import com.unknownnpc.webm2mp4.data.RequestData
 import com.unknownnpc.webm2mp4.processor.DataProcessor
 import com.unknownnpc.webm2mp4.processor.DataProcessor.{ConvertorError, DataProcessorService, InvalidInputFormat, LocalStorageError}
 import html.index
@@ -10,10 +11,12 @@ import zhttp.http._
 import zio._
 import zio.blocking.Blocking
 import zio.logging.{Logging, _}
-import zio.stream.ZStream
+import zio.stream.{Sink, ZStream}
 
 import java.io.File
 import java.nio.file.Paths
+import javax.mail.internet.MimeMultipart
+import javax.mail.util.ByteArrayDataSource
 
 object WebAPI {
 
@@ -65,11 +68,16 @@ object WebAPI {
 
       rec.data.content match {
         case CompleteData(data) =>
+          val multipartDataSource = new ByteArrayDataSource(data.toArray, "multipart/form-data")
+          val multipart = new MimeMultipart(multipartDataSource)
+          val part = multipart.getBodyPart(0)
 
           val result: ZIO[Blocking with Logging with DataProcessorService, DataProcessor.DataProcessorError, File] = for {
+            inputBytes <- ZStream.fromInputStreamEffect(ZIO.succeed(part.getInputStream)).runCollect.orDie
+            requestData = RequestData(part.getFileName, inputBytes)
             dataProcessor <- ZIO.environment[DataProcessorService]
             _ <- log.info(s"Retrieved request with file: ${data.length} bytes")
-            response <- dataProcessor.get.process(data)
+            response <- dataProcessor.get.process(requestData)
           } yield response
           result.foldM(errorToResponse, dataToResponse)
 

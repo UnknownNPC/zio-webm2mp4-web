@@ -14,7 +14,7 @@ lazy val compileDependencies = Seq(
   "ws.schild" % "jave-core" % javeCore,
   "ws.schild" % "jave-all-deps" % javeCore,
   "io.d11" %% "zhttp" % zHttp,
-
+  "com.sun.mail" % "javax.mail" % "1.6.2"
 ) map (_ % Compile)
 
 lazy val testDependencies = Seq(

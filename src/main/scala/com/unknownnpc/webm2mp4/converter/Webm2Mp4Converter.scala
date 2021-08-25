@@ -23,29 +23,30 @@ object Webm2Mp4Converter {
     def getOutFilePath = (from: File) => s"${from.getParent}/${from.getName}_${outFileDateFormat.format(new Date())}.mp4"
 
     (from: File) => {
+      val tryConverting = Try {
+        val audio = new AudioAttributes
+        audio.setCodec(AudioAttributes.DIRECT_STREAM_COPY)
 
-      val audio = new AudioAttributes
-      audio.setCodec(AudioAttributes.DIRECT_STREAM_COPY)
+        val video = new VideoAttributes
+        video.setCodec("mpeg4")
+        video.setBitRate(128000)
+        video.setFrameRate(30)
 
-      val video = new VideoAttributes
-      video.setCodec("mpeg4")
-      video.setBitRate(128000)
-      video.setFrameRate(30)
+        val attrs = new EncodingAttributes
+        attrs.setAudioAttributes(audio)
+        attrs.setVideoAttributes(video)
 
-      val attrs = new EncodingAttributes
-      attrs.setAudioAttributes(audio)
-      attrs.setVideoAttributes(video)
+        val encoder = new Encoder
+        val to = new File(getOutFilePath(from))
+        encoder.encode(new MultimediaObject(from), to, attrs)
 
-      val encoder = new Encoder
-
-      val to = new File(getOutFilePath(from))
-
+        to
+      }
       val start = System.currentTimeMillis()
-
       for {
-        _ <- ZIO.fromTry(Try(encoder.encode(new MultimediaObject(from), to, attrs)))
+        result <- ZIO.fromTry(tryConverting)
         _ <- logger.info(s"Convert time: ${System.currentTimeMillis() - start} ms")
-      } yield to
+      } yield result
     }
   }
   }

@@ -13,7 +13,7 @@ import zio.blocking.Blocking
 import zio.logging.{Logging, _}
 import zio.stream.ZStream
 
-import java.io.File
+import java.io.{File, IOException}
 import java.nio.file.Paths
 import javax.mail.internet.MimeMultipart
 import javax.mail.util.ByteArrayDataSource
@@ -72,9 +72,10 @@ object WebAPI {
           val multipart = new MimeMultipart(multipartDataSource)
           val part = multipart.getBodyPart(0)
 
+          val dataStream: ZStream[Blocking, IOException, Byte] = ZStream.fromInputStreamEffect(ZIO.succeed(part.getInputStream))
+          val requestData = RequestData(part.getFileName, part.getSize, dataStream)
+
           val result: ZIO[Blocking with Logging with DataProcessorService, DataProcessor.DataProcessorError, File] = for {
-            inputBytes <- ZStream.fromInputStreamEffect(ZIO.succeed(part.getInputStream)).runCollect.orDie
-            requestData = RequestData(part.getFileName, inputBytes)
             dataProcessor <- ZIO.environment[DataProcessorService]
             _ <- log.info(s"Retrieved request with file: ${data.length} bytes")
             response <- dataProcessor.get.process(requestData)

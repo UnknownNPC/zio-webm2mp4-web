@@ -23,7 +23,7 @@ object Webm2Mp4Converter {
     def getOutFilePath = (from: File) => s"${from.getParent}/${from.getName}_${outFileDateFormat.format(new Date())}.mp4"
 
     (from: File) => {
-      val tryConverting = Try {
+      def tryConverting = Try {
         val audio = new AudioAttributes
         audio.setCodec(AudioAttributes.DIRECT_STREAM_COPY)
 

@@ -20,6 +20,8 @@ import javax.mail.util.ByteArrayDataSource
 
 object WebAPI {
 
+  val mp4ContentTypeHeader = Header(HttpHeaderNames.CONTENT_TYPE, AsciiString.cached("video/mp4"))
+
   val app: HttpApp[Blocking with Logging with DataProcessorService, Throwable] = HttpApp.collectM {
     case Method.GET -> Root =>
       IO.succeed(Response.http(
@@ -63,7 +65,8 @@ object WebAPI {
       }
 
       def dataToResponse(file: File): UIO[Response.HttpResponse[Blocking, Throwable]] = {
-        IO.succeed(Response.http(content = HttpData.fromStream(ZStream.fromFile(file.toPath))))
+        IO.succeed(Response.http(
+          content = HttpData.fromStream(ZStream.fromFile(file.toPath)), headers = List(mp4ContentTypeHeader)))
       }
 
       rec.data.content match {

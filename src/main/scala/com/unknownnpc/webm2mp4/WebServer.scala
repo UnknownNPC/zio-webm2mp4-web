@@ -2,7 +2,6 @@ package com.unknownnpc.webm2mp4
 
 import com.unknownnpc.webm2mp4.config.AppConfig
 import com.unknownnpc.webm2mp4.config.AppConfig.{Config, ConfigService}
-import com.unknownnpc.webm2mp4.converter.Stream2FileConverter.Chunk2FileConverterService
 import com.unknownnpc.webm2mp4.converter.{Stream2FileConverter, Webm2Mp4Converter}
 import com.unknownnpc.webm2mp4.processor.DataProcessor
 import com.unknownnpc.webm2mp4.processor.DataProcessor.DataProcessorService
@@ -17,6 +16,10 @@ import zio.config.getConfig
 import zio.console.Console
 import zio.logging.{LogFormat, LogLevel, Logging, log}
 
+import java.io.File
+import java.nio.file.Files
+import scala.util.Try
+
 object WebServer extends App {
 
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = {
@@ -25,7 +28,10 @@ object WebServer extends App {
       with Logging with ConfigService with DataProcessorService, Nothing, Unit] = {
       for {
         config <- getConfig[Config]
-        _ <- log.info(s"App config $config")
+        _ <- log.info(s"Crating apps temp folder: ${config.input.tempFolderName}")
+        _ <- ZIO.fromTry(Try(Files.createDirectory(new File(s"./${config.input.tempFolderName}").toPath))).orDie
+        _ <- log.info(s"Done")
+        _ <- log.info(s"Starting application with next config: $config")
         server <- (Server.port(config.web.port) ++
           Server.maxRequestSize(config.input.maxFileSize) ++ Server.app(WebAPI.app)).make
           .use(_ =>
@@ -45,11 +51,11 @@ object WebServer extends App {
     val configService = AppConfig.live
     val blockingService = Blocking.live
 
-    val stream2FileConverter: ZLayer[Logging with Blocking, Throwable, Chunk2FileConverterService] = Stream2FileConverter.live
-    val stream2FileConverterWithoutDeps = (blockingService ++ loggingEnvWithoutDeps) >>> stream2FileConverter
+    val stream2FileConverter = Stream2FileConverter.live
+    val stream2FileConverterWithoutDeps = (configService ++ blockingService ++ loggingEnvWithoutDeps) >>> stream2FileConverter
 
     val webm2Mp4ConverterService = Webm2Mp4Converter.live
-    val webm2Mp4ConverterServiceWithoutDeps = loggingEnvWithoutDeps >>> webm2Mp4ConverterService
+    val webm2Mp4ConverterServiceWithoutDeps = configService ++ loggingEnvWithoutDeps >>> webm2Mp4ConverterService
 
     val inputValidatorService = InputValidator.live
     val inputValidatorServiceWithoutDeps = configService >>> inputValidatorService
@@ -57,7 +63,7 @@ object WebServer extends App {
     val dataProcessorService = (stream2FileConverterWithoutDeps ++ webm2Mp4ConverterServiceWithoutDeps ++ inputValidatorServiceWithoutDeps) >>> DataProcessor.live
 
     val serverDeps = EventLoopGroup.auto(100) ++ ServerChannelFactory.auto ++ blockingService ++ loggingEnvWithoutDeps ++ configService ++ dataProcessorService
-      server
+    server
       .provideCustomLayer(serverDeps)
       .exitCode
   }

@@ -10,7 +10,7 @@ object AppConfig {
 
   case class Config(web: Web, input: Input)
   case class Web(url: String, port: Int)
-  case class Input(maxFileSize: Int)
+  case class Input(maxFileSize: Int, tempFolderName: String)
 
   private val configDescription = DeriveConfigDescriptor.descriptor[Config]
 

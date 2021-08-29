@@ -17,8 +17,8 @@ import zio.console.Console
 import zio.logging.{LogFormat, LogLevel, Logging, log}
 
 import java.io.File
-import java.nio.file.Files
-import scala.util.Try
+import java.nio.file.{FileAlreadyExistsException, Files}
+import scala.util.{Success, Try}
 
 object WebServer extends App {
 
@@ -26,10 +26,18 @@ object WebServer extends App {
 
     val server: ZIO[EventLoopGroup with ServerChannelFactory with Blocking
       with Logging with ConfigService with DataProcessorService, Nothing, Unit] = {
+
+      def createDir(folderName: String) = {
+        val path = new File(s"./${folderName}").toPath
+        Try(Files.createDirectory(path)).recoverWith {
+          case _: FileAlreadyExistsException => Success(path)
+        }
+      }
+
       for {
         config <- getConfig[Config]
         _ <- log.info(s"Crating apps temp folder: ${config.input.tempFolderName}")
-        _ <- ZIO.fromTry(Try(Files.createDirectory(new File(s"./${config.input.tempFolderName}").toPath))).orDie
+        _ <- ZIO.fromTry(createDir(config.input.tempFolderName)).orDie
         _ <- log.info(s"Done")
         _ <- log.info(s"Starting application with next config: $config")
         server <- (Server.port(config.web.port) ++

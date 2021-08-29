@@ -14,7 +14,6 @@ import zio.logging.{Logging, _}
 import zio.stream.ZStream
 
 import java.io.{File, IOException}
-import java.nio.file.Paths
 import javax.mail.internet.MimeMultipart
 import javax.mail.util.ByteArrayDataSource
 
@@ -34,9 +33,9 @@ object WebAPI {
       ))
     case Method.GET -> Root / "static" / name =>
       val content = HttpData.fromStream {
-        ZStream.fromFile(
-          Paths.get(
-            getClass.getClassLoader.getResource(s"web/static/$name").toURI
+        ZStream.fromInputStreamEffect(
+          ZIO.succeed(
+            getClass.getClassLoader.getResourceAsStream(s"web/static/$name")
           )
         )
       }

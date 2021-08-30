@@ -28,7 +28,6 @@ object Webm2Mp4Converter {
           video.setCodec("mpeg4")
           video.setBitRate(128000)
           video.setFrameRate(30)
-          video.setCodec(VideoAttributes.DIRECT_STREAM_COPY);
 
           val attrs = new EncodingAttributes
           attrs.setAudioAttributes(audio)

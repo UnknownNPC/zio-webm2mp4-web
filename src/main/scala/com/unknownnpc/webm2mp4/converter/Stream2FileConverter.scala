@@ -1,15 +1,14 @@
 package com.unknownnpc.webm2mp4.converter
 
-import com.unknownnpc.webm2mp4.config.AppConfig.{Config, ConfigService}
 import com.unknownnpc.webm2mp4.data.RequestData
+import com.unknownnpc.webm2mp4.storage.FileManager
+import com.unknownnpc.webm2mp4.storage.FileManager.FileManagerService
 import zio.blocking._
 import zio.logging._
 import zio.stream.ZSink
 import zio.{Has, ZIO, ZLayer}
 
 import java.io.{File, IOException}
-import java.nio.file.Paths
-import java.util.UUID
 import scala.util.Try
 
 object Stream2FileConverter {
@@ -18,14 +17,12 @@ object Stream2FileConverter {
 
   trait Service extends Converter[RequestData, ZIO[Blocking, Throwable, File]]
 
-  val live: ZLayer[Logging with Blocking with ConfigService, Throwable, Chunk2FileConverterService] =
-    ZLayer.fromServices[Logger[String], Config, Service] { (logging, config) => {
-
-      def getTempFile(name: String, tempFolderName: String) = Paths.get(s"$tempFolderName/${UUID.randomUUID}_$name").toFile
-
+  val live: ZLayer[Logging with Blocking with FileManagerService, Throwable, Chunk2FileConverterService] =
+    ZLayer.fromServices[Logger[String], FileManager.Service, Service] { (logging, fileManager) => {
       (from: RequestData) => {
-        val tempFile = getTempFile(from.filename, config.input.tempFolderName)
         for {
+          tempPath <- fileManager.getTempPathBy(from.filename)
+          tempFile = tempPath.toFile
           _ <- logging.info(s"Saving ${from.dataSize} bytes to the next temp file $tempFile")
           _ <- ZIO.fromTry(Try(tempFile.createNewFile()))
           savedBytes <- from.data.run(ZSink.fromFile(tempFile.toPath))

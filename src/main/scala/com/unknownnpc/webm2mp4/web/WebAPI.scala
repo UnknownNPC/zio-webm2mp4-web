@@ -3,34 +3,36 @@ package com.unknownnpc.webm2mp4.web
 import com.unknownnpc.webm2mp4.data.RequestData
 import com.unknownnpc.webm2mp4.processor.DataProcessor
 import com.unknownnpc.webm2mp4.processor.DataProcessor.{ConvertorError, DataProcessorService, InvalidInputFormat, LocalStorageError}
-import html.index
+import com.unknownnpc.webm2mp4.storage.FileManager.FileManagerService
+import html.{done, error, index}
 import io.netty.handler.codec.http.{HttpHeaderNames, HttpHeaderValues}
 import io.netty.util.AsciiString
 import zhttp.http.HttpData.CompleteData
-import zhttp.http._
+import zhttp.http.{Header, _}
 import zio._
 import zio.blocking.Blocking
 import zio.logging.{Logging, _}
 import zio.stream.ZStream
 
 import java.io.{File, IOException}
+import java.nio.file
 import javax.mail.internet.MimeMultipart
 import javax.mail.util.ByteArrayDataSource
 
 object WebAPI {
 
   val mp4ContentTypeHeader = Header(HttpHeaderNames.CONTENT_TYPE, AsciiString.cached("video/mp4"))
+  val textHtmlContentTypeHeader = Header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_HTML)
 
-  val app: HttpApp[Blocking with Logging with DataProcessorService, Throwable] = HttpApp.collectM {
+  val app: HttpApp[Blocking with Logging with DataProcessorService with FileManagerService, Throwable] = HttpApp.collectM {
     case Method.GET -> Root =>
       IO.succeed(Response.http(
         content = HttpData.CompleteData(Chunk.fromArray(
           index.render.toString().getBytes(HTTP_CHARSET))
         ),
-        headers = List(
-          Header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_HTML)
-        ),
+        headers = List(textHtmlContentTypeHeader),
       ))
+
     case Method.GET -> Root / "static" / name =>
       val content = HttpData.fromStream {
         ZStream.fromInputStreamEffect(
@@ -39,34 +41,54 @@ object WebAPI {
           )
         )
       }
-      val contentTypeHader = name.split("\\.").lastOption match {
+      val contentTypeHeader = name.split("\\.").lastOption match {
         case Some("js") => Header(HttpHeaderNames.CONTENT_TYPE, AsciiString.cached("application/javascript"))
         case Some("css") => Header(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_CSS)
         case _ => throw new RuntimeException(s"Unknown static format $name")
       }
       val cacheControlHeader = Header(HttpHeaderNames.CACHE_CONTROL, s"${HttpHeaderValues.MAX_AGE}=86400")
       IO.succeed(
-        Response.http(content = content, headers = List(contentTypeHader, cacheControlHeader)))
+        Response.http(content = content, headers = List(contentTypeHeader, cacheControlHeader)))
+
+    case Method.GET -> Root / "download" / name =>
+      val filePathEffect: ZIO[FileManagerService, Nothing, file.Path] = for {
+        fileManger <- ZIO.environment[FileManagerService]
+        path <- fileManger.get.getPathBy(name)
+      } yield path
+
+      filePathEffect.flatMap(path => {
+        val httpData = HttpData.fromStream(ZStream.fromFile(path))
+        IO.succeed(
+          Response.http(content = httpData, headers = List(mp4ContentTypeHeader)))
+      })
 
     case rec@Method.POST -> Root / "upload" =>
 
-      def string2HttpData(str: String) = HttpData.CompleteData(Chunk.fromArray(str.getBytes))
+      def errorResponse(errorMsg: String) = {
+        IO.succeed(Response.http(
+          status = Status.INTERNAL_SERVER_ERROR,
+          content = HttpData.CompleteData(Chunk.fromArray(
+            error.render(errorMsg).toString().getBytes(HTTP_CHARSET))
+          ),
+          headers = List(textHtmlContentTypeHeader),
+        ))
+      }
 
-      def errorToResponse(error: DataProcessor.DataProcessorError): UIO[Response.HttpResponse[Any, Nothing]] = {
-        error match {
-          case LocalStorageError => IO.succeed(Response.http(status = Status.INTERNAL_SERVER_ERROR,
-            content = string2HttpData("Internal server error (hdd)")))
-          case InvalidInputFormat => IO.succeed(Response.http(status = Status.INTERNAL_SERVER_ERROR,
-            content = string2HttpData("Invalid input file")))
-          case ConvertorError => IO.succeed(Response.http(status = Status.INTERNAL_SERVER_ERROR,
-            content = string2HttpData("Internal converter error")))
+      def processorErrorToResponse(dataProcessorError: DataProcessor.DataProcessorError): UIO[Response.HttpResponse[Any, Nothing]] = {
+        dataProcessorError match {
+          case LocalStorageError => errorResponse("Internal server error (hdd)")
+          case InvalidInputFormat => errorResponse("Invalid input file")
+          case ConvertorError => errorResponse("Internal converter error")
         }
       }
 
-      def dataToResponse(file: File): UIO[Response.HttpResponse[Blocking, Throwable]] = {
+      def dataToResponse(file: File) =
         IO.succeed(Response.http(
-          content = HttpData.fromStream(ZStream.fromFile(file.toPath)), headers = List(mp4ContentTypeHeader)))
-      }
+          content = HttpData.CompleteData(Chunk.fromArray(
+            done.render(file.getName).toString().getBytes(HTTP_CHARSET))
+          ),
+          headers = List(textHtmlContentTypeHeader),
+        ))
 
       rec.data.content match {
         case CompleteData(data) =>
@@ -82,9 +104,9 @@ object WebAPI {
             _ <- log.info(s"Retrieved request with file: ${data.length} bytes")
             response <- dataProcessor.get.process(requestData)
           } yield response
-          result.foldM(errorToResponse, dataToResponse)
+          result.foldM(processorErrorToResponse, dataToResponse)
 
-        case _ => IO.succeed(Response.text("nothing to do here"))
+        case _ => errorResponse("nothing to do here")
       }
   }
 }

@@ -1,14 +1,13 @@
 package com.unknownnpc.webm2mp4.converter
 
-import com.unknownnpc.webm2mp4.config.AppConfig.{Config, ConfigService}
+import com.unknownnpc.webm2mp4.storage.FileManager
+import com.unknownnpc.webm2mp4.storage.FileManager.FileManagerService
 import ws.schild.jave.encode.{AudioAttributes, EncodingAttributes, VideoAttributes}
 import ws.schild.jave.{Encoder, MultimediaObject}
 import zio.logging._
 import zio.{Has, IO, ZIO, ZLayer}
 
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
 import scala.util.Try
 
 object Webm2Mp4Converter {
@@ -17,16 +16,11 @@ object Webm2Mp4Converter {
 
   trait Service extends Converter[File, IO[Throwable, File]]
 
-  val live: ZLayer[Logging with ConfigService, Throwable, Webm2Mp4ConverterService] =
-    ZLayer.fromServices[Logger[String], Config, Service] { (logger, config) => {
-
-      val outFileDateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm")
-
-      def getOutFilePath = (from: File, tempFolderName: String) =>
-        s"$tempFolderName/${from.getName}_${outFileDateFormat.format(new Date())}.mp4"
+  val live: ZLayer[Logging with FileManagerService, Throwable, Webm2Mp4ConverterService] =
+    ZLayer.fromServices[Logger[String], FileManager.Service, Service] { (logger, fileManagerService) => {
 
       (from: File) => {
-        def tryConverting(tempFolderName: String) = Try {
+        def tryConverting(to: File) = Try {
           val audio = new AudioAttributes
           audio.setCodec(AudioAttributes.DIRECT_STREAM_COPY)
 
@@ -40,7 +34,7 @@ object Webm2Mp4Converter {
           attrs.setVideoAttributes(video)
 
           val encoder = new Encoder
-          val to = new File(getOutFilePath(from, tempFolderName))
+
           encoder.encode(new MultimediaObject(from), to, attrs)
 
           to
@@ -48,7 +42,9 @@ object Webm2Mp4Converter {
 
         val start = System.currentTimeMillis()
         for {
-          result <- ZIO.fromTry(tryConverting(config.input.tempFolderName))
+          toPath <- fileManagerService.getOutFilePath(from.getName)
+          toFile = toPath.toFile
+          result <- ZIO.fromTry(tryConverting(toFile))
           _ <- logger.info(s"Convert time: ${System.currentTimeMillis() - start} ms")
         } yield result
       }

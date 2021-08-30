@@ -12,7 +12,9 @@ lazy val compileDependencies = Seq(
   "dev.zio" %% "zio-config-magnolia" % zioConfig,
   "dev.zio" %% "zio-logging" % "0.5.11",
   "ws.schild" % "jave-core" % javeCore,
-  "ws.schild" % "jave-all-deps" % javeCore,
+  "ws.schild" % "jave-nativebin-linux64" % javeCore,
+  "ws.schild" % "jave-nativebin-win64" % javeCore,
+  "ws.schild" % "jave-nativebin-osx64" % javeCore,
   "io.d11" %% "zhttp" % zHttp,
   "com.sun.mail" % "javax.mail" % "1.6.2"
 ) map (_ % Compile)

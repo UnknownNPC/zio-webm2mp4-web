@@ -20,7 +20,7 @@ import zio.logging.{LogFormat, LogLevel, Logging, log}
 
 import java.io.File
 import java.nio.file.{FileAlreadyExistsException, Files}
-import scala.util.{Success, Try}
+import scala.util.{Properties, Success, Try}
 
 object WebServer extends App {
 
@@ -38,14 +38,15 @@ object WebServer extends App {
 
       for {
         config <- getConfig[Config]
+        port <- ZIO.succeed(Properties.envOrElse("PORT", config.web.port.toString).toInt)
         _ <- log.info(s"Crating apps temp folder: ${config.input.tempFolderName}")
         _ <- ZIO.fromTry(createDir(config.input.tempFolderName)).orDie
         _ <- log.info(s"Done")
         _ <- log.info(s"Starting application with next config: $config")
-        server <- (Server.port(config.web.port) ++
+        server <- (Server.port(port) ++
           Server.maxRequestSize(config.input.maxFileSize) ++ Server.app(WebAPI.app)).make
           .use(_ =>
-            log.info(s"Server started on port ${config.web.port}")
+            log.info(s"Server started on port $port")
               *> ZIO.never,
           ).orDie
       } yield server

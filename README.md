@@ -6,3 +6,6 @@ Experimenting with zio + zhttp + twirl
 1. Compile project `sbt compile`
 2. Run project `sbt run`
 3. Open http://localhost:8080
+
+### Example
+Try now here https://webm2mp4-converter.herokuapp.com/, and deploy your own now.

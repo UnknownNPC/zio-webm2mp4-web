@@ -28,6 +28,7 @@ object Webm2Mp4Converter {
           video.setCodec("mpeg4")
           video.setBitRate(128000)
           video.setFrameRate(30)
+          video.setCodec(VideoAttributes.DIRECT_STREAM_COPY);
 
           val attrs = new EncodingAttributes
           attrs.setAudioAttributes(audio)
@@ -40,11 +41,10 @@ object Webm2Mp4Converter {
           to
         }
 
-        val start = System.currentTimeMillis()
         for {
+          start <- ZIO.succeed(System.currentTimeMillis())
           toPath <- fileManagerService.getOutFilePath(from.getName)
-          toFile = toPath.toFile
-          result <- ZIO.fromTry(tryConverting(toFile))
+          result <- ZIO.fromTry(tryConverting(toPath.toFile))
           _ <- logger.info(s"Convert time: ${System.currentTimeMillis() - start} ms")
         } yield result
       }
@@ -52,6 +52,6 @@ object Webm2Mp4Converter {
     }
 
   def convert(from: File): ZIO[Webm2Mp4ConverterService, Throwable, File] =
-    ZIO.accessM(d => d.get.convert(from))
+    ZIO.accessM(_.get.convert(from))
 
 }

@@ -32,9 +32,8 @@ lazy val settings = Seq(
   mainClass in(Compile, run) := Some("com.unknownnpc.webm2mp4.WebServer"),
   sourceDirectories in (Compile, TwirlKeys.compileTemplates) +=
    ((resourceDirectory in Compile).value / "web" / "templates")
-
 )
 
 lazy val root = (project in file("."))
   .settings(settings)
-    .enablePlugins(SbtTwirl)
+    .enablePlugins(SbtTwirl, JavaAppPackaging)

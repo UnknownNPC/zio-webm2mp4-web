@@ -22,10 +22,10 @@ object Webm2Mp4Converter {
       (from: File) => {
         def tryConverting(to: File) = Try {
           val audio = new AudioAttributes
-          audio.setCodec(AudioAttributes.DIRECT_STREAM_COPY)
+          audio.setCodec("libvorbis")
 
           val video = new VideoAttributes
-          video.setCodec("mpeg4")
+          video.setCodec("libvpx-vp9")
           video.setBitRate(128000)
           video.setFrameRate(30)
 
@@ -41,10 +41,11 @@ object Webm2Mp4Converter {
         }
 
         for {
+          _ <- logger.info(s"File [${from.getName}] convertion is starting...")
           start <- ZIO.succeed(System.currentTimeMillis())
           toPath <- fileManagerService.getOutFilePath(from.getName)
           result <- ZIO.fromTry(tryConverting(toPath.toFile))
-          _ <- logger.info(s"Convert time: ${System.currentTimeMillis() - start} ms")
+          _ <- logger.info(s"Convert time: ${(System.currentTimeMillis() - start) / 1000} s")
         } yield result
       }
     }
